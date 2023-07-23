@@ -1,13 +1,10 @@
-
-
 BASEPATH=$1
 if [ "$#" -ne 1 ]; then
    BASEPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 fi
 echo using BASEPATH=$BASEPATH
 
-module load cmake/3.23.2 gcc/11.1.0
-module swap cuda cuda/11.8.0
+module load cmake/3.23.2 rocm/5.5.0
 
 export INSTPATH=install
 export KOKKOS_HOME=$BASEPATH/kokkos/$INSTPATH

@@ -7,7 +7,6 @@ fi
 echo using BASEPATH=$BASEPATH
 
 module load cmake/3.23.2 gcc/11.1.0
-module swap cuda cuda/11.8.0
 
 export INSTPATH=install
 export KOKKOS_HOME=$BASEPATH/kokkos/$INSTPATH
