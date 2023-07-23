@@ -8,10 +8,18 @@ logger = logging.getLogger(__name__)
 DEFAULT_KOKKOS_VERSION="3.7.02"
 
 cuda_arch = [
-   "Kokkos_ARCH_VOLTA70",
-   "Kokkos_ARCH_AMPERE80",
+   "Kokkos_ARCH_VOLTA70",  # V100
+   "Kokkos_ARCH_AMPERE80", # A100
 ]
 
+amd_arch = [
+   "Kokkos_ARCH_VEGA90A", # MI250
+   "Kokkos_ARCH_VEGA908", # MI100
+]
+
+openmp_arch = [
+   "Kokkos_ARCH_SKX", # Intel SkyLake
+]
 
 
 def main():
@@ -65,13 +73,13 @@ def main():
       shared_libs = "On"
    
    # create working directory
-   base_install_path = os.path.join(args.target,"kokkos-" + args.kokkos_tag,args.arch)
+   target_path = os.path.abspath(args.target)
+   base_install_path = os.path.join(target_path,"kokkos-" + args.kokkos_tag,args.arch,args.build_type)
    prepare_target(base_install_path)
    os.chdir(base_install_path)
 
    # clone kokkos
    cmake_opts = {
-      "Kokkos_ENABLE_CUDA": "On",
       args.arch: "On",
       "CMAKE_CXX_STANDARD": args.cstd,
       "CMAKE_POSITION_INDEPENDENT_CODE": "On",
@@ -80,8 +88,16 @@ def main():
       "CMAKE_BUILD_TYPE": args.build_type,
    }
    if args.arch in cuda_arch:
+      cmake_opts["Kokkos_ENABLE_CUDA"] = "On"
       cmake_opts["Kokkos_ENABLE_CUDA_LAMBDA"] = "On"
       cmake_opts["Kokkos_ENABLE_CUDA_CONSTEXPR"] = "On"
+   elif args.arch in amd_arch:
+      cmake_opts["Kokkos_ENABLE_HIP"] = "On"
+      cmake_opts["CMAKE_CXX_COMPILER"] = "$(which hipcc)"
+   elif args.arch in openmp_arch:
+      cmake_opts["Kokkos_ENABLE_OPENMP"] = "On"
+
+
    git_clone(args.kokkos_repo,args.kokkos_tag)
    cmake_build_and_install(base_install_path,
                            args.kokkos_repo,
@@ -99,6 +115,8 @@ def main():
    }
    # if args.arch in cuda_arch:
    #    cmake_opts["CUDA_TOOLKIT_ROOT_DIR"] = "$CUDA_HOME"
+   if args.arch in amd_arch:
+      cmake_opts["CMAKE_CXX_COMPILER"] = "$(which hipcc)"
    cmake_build_and_install(base_install_path,
                            args.kokkos_kernels_repo,
                            args.setup_script,
@@ -133,11 +151,12 @@ def cmake_build_and_install(install_path: str, repo_url: str, setup_script: str,
 
    # Run the command
    completed = subprocess.run(full_cmd, shell=True, 
-                              cwd=repo_path, check=True,
+                              cwd=repo_path,
                               stdout=open(f"{repo_name}_cmake_stdout.txt","w"),
                               stderr=open(f"{repo_name}_cmake_stderr.txt","w"))
    if completed.returncode != 0:
       logger.error("cmake for %s returned non-zero value: %d",repo_name,completed.returncode)
+      raise Exception("return code non-zero")
 
 
 def prepare_target(target: str):
