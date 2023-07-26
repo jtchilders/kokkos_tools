@@ -5,8 +5,24 @@ from typing import Dict
 
 logger = logging.getLogger(__name__)
 
+# default KOKKOS REPO & VERSION
+DEFAULT_KOKKOS_REPO="https://github.com/kokkos/kokkos.git"
 DEFAULT_KOKKOS_VERSION="3.7.02"
 
+# default KOKKOS KERNELS REPO & VERSION
+DEFAULT_KOKKOS_KERNELS_REPO="https://github.com/kokkos/kokkos-kernels.git"
+DEFAULT_KOKKOS_KERNELS_VERSION=DEFAULT_KOKKOS_VERSION
+
+# default KOKKOS KERNELS REPO & VERSION
+DEFAULT_KOKKOS_TOOLS_REPO="https://github.com/kokkos/kokkos-kernels.git"
+DEFAULT_KOKKOS_TOOLS_VERSION=""
+
+# default C++ standard
+DEFAULT_CXX_STANDARD="17"
+
+
+# these are used to identify specific CMAKE variables 
+# that will be used for each architecture.
 cuda_arch = [
    "Kokkos_ARCH_VOLTA70",  # V100
    "Kokkos_ARCH_AMPERE80", # A100
@@ -28,22 +44,22 @@ def main():
    logging_datefmt = "%Y-%m-%d %H:%M:%S"
    logging_level = logging.INFO
    
-   parser = argparse.ArgumentParser(description="")
-   parser.add_argument("-t","--target",help="target path for installation; note that the kokkos tag and architecture will be appended",required=True)
+   parser = argparse.ArgumentParser(description="Clones and builds kokkos and kokkos-kernels. Clones Kokkos-tools as well.")
+   parser.add_argument("-t","--target",help="target base path for installation; note that the kokkos tag, architecture, and build type will be appended to this, e.g. <target>/kokkos-<version>/<arch>/<build>. All repos will be checked out here and a copy of the environment script will be dumped here, named 'setup.sh'.",required=True)
 
-   parser.add_argument("--kokkos-repo",help="git url for kokkos",default="https://github.com/kokkos/kokkos.git")
-   parser.add_argument("--kokkos-tag",help="git url for kokkos",default=DEFAULT_KOKKOS_VERSION)
+   parser.add_argument("--kokkos-repo",help=f"git url for kokkos; default = '{DEFAULT_KOKKOS_REPO}'",default=DEFAULT_KOKKOS_REPO)
+   parser.add_argument("--kokkos-tag",help=f"tag to checkout for kokkos; default = '{DEFAULT_KOKKOS_VERSION}'",default=DEFAULT_KOKKOS_VERSION)
 
-   parser.add_argument("--kokkos-kernels-repo",help="git url for kokkos",default="https://github.com/kokkos/kokkos-kernels.git")
-   parser.add_argument("--kokkos-kernels-tag",help="git url for kokkos",default=DEFAULT_KOKKOS_VERSION,type=str)
+   parser.add_argument("--kokkos-kernels-repo",help=f"git url for kokkos-kernels; default = '{DEFAULT_KOKKOS_KERNELS_REPO}'",default=DEFAULT_KOKKOS_KERNELS_REPO)
+   parser.add_argument("--kokkos-kernels-tag",help=f"tag to checkout for kokkos-kernels; default = '{DEFAULT_KOKKOS_KERNELS_VERSION}'",default=DEFAULT_KOKKOS_KERNELS_VERSION)
 
-   parser.add_argument("--kokkos-tools-repo",help="git url for kokkos",default="https://github.com/kokkos/kokkos-tools.git")
-   parser.add_argument("--kokkos-tools-tag",help="git url for kokkos",default="",type=str)
+   parser.add_argument("--kokkos-tools-repo",help=f"git url for kokkos-tools; default = '{DEFAULT_KOKKOS_TOOLS_REPO}'",default=DEFAULT_KOKKOS_TOOLS_REPO)
+   parser.add_argument("--kokkos-tools-tag",help=f"tag to checkout for kokkos-tools; default = '{DEFAULT_KOKKOS_TOOLS_VERSION}'",default=DEFAULT_KOKKOS_TOOLS_VERSION)
 
    parser.add_argument("-a","--arch",help="target architecture, e.g.: Kokkos_ARCH_SKX, Kokkos_ARCH_VEGA908, Kokkos_ARCH_AMPERE80",required=True)
-   parser.add_argument("-c","--cstd",help="target c++ standard, e.g.: 17, 20, ...",default="17")
+   parser.add_argument("-c","--cstd",help=f"target c++ standard, e.g.: 17, 20, ...; default = {DEFAULT_CXX_STANDARD}",default=DEFAULT_CXX_STANDARD)
    parser.add_argument("-b","--setup-script",help="the setup script to run before building software",required=True)
-   parser.add_argument("-r","--build-type",help="the cmake build type, e.g.: DEBUG, Release, RelWithDebInfo ",default="RelWithDebInfo")
+   parser.add_argument("-r","--build-type",help="the cmake build type, e.g.: DEBUG (-g), Release (-O3), RelWithDebInfo (-O2) ",required=True)
 
 
    parser.add_argument("--shared-libs", default=False, action="store_true", help="Build shared libraries")
@@ -113,8 +129,6 @@ def main():
       "CMAKE_CXX_STANDARD": args.cstd,
       "BUILD_SHARED_LIBS": shared_libs,
    }
-   # if args.arch in cuda_arch:
-   #    cmake_opts["CUDA_TOOLKIT_ROOT_DIR"] = "$CUDA_HOME"
    if args.arch in amd_arch:
       cmake_opts["CMAKE_CXX_COMPILER"] = "$(which hipcc)"
    cmake_build_and_install(base_install_path,
