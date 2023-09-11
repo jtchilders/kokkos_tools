@@ -14,7 +14,7 @@ DEFAULT_KOKKOS_KERNELS_REPO="https://github.com/kokkos/kokkos-kernels.git"
 DEFAULT_KOKKOS_KERNELS_VERSION=DEFAULT_KOKKOS_VERSION
 
 # default KOKKOS KERNELS REPO & VERSION
-DEFAULT_KOKKOS_TOOLS_REPO="https://github.com/kokkos/kokkos-kernels.git"
+DEFAULT_KOKKOS_TOOLS_REPO="https://github.com/kokkos/kokkos-tools.git"
 DEFAULT_KOKKOS_TOOLS_VERSION=""
 
 # default C++ standard
@@ -61,6 +61,11 @@ def main():
    parser.add_argument("-b","--setup-script",help="the setup script to run before building software",required=True)
    parser.add_argument("-r","--build-type",help="the cmake build type, e.g.: DEBUG (-g), Release (-O3), RelWithDebInfo (-O2) ",required=True)
 
+   parser.add_argument("--cxx",help="if set, this string is passed to the -DCMAKE_CXX_COMPILER flag")
+   parser.add_argument("--cc",help="if set, this string is passed to the -DCMAKE_C_COMPILER flag")
+   
+   parser.add_argument("--cxx-extensions", default=False, action="store_true", help="Set CMAKE_CXX_EXTENSIONS=On")
+
 
    parser.add_argument("--shared-libs", default=False, action="store_true", help="Build shared libraries")
 
@@ -100,7 +105,6 @@ def main():
       "CMAKE_CXX_STANDARD": args.cstd,
       "CMAKE_POSITION_INDEPENDENT_CODE": "On",
       "BUILD_SHARED_LIBS": shared_libs,
-      "CMAKE_CXX_EXTENSIONS": "On",
       "CMAKE_BUILD_TYPE": args.build_type,
    }
    if args.arch in cuda_arch:
@@ -112,6 +116,16 @@ def main():
       cmake_opts["CMAKE_CXX_COMPILER"] = "$(which hipcc)"
    elif args.arch in openmp_arch:
       cmake_opts["Kokkos_ENABLE_OPENMP"] = "On"
+   
+   if args.cxx:
+      cmake_opts["CMAKE_CXX_COMPILER"] = args.cxx
+   if args.cc:
+      cmake_opts["CMAKE_C_COMPILER"] = args.cc
+
+   if args.cxx_extensions:
+      cmake_opts["CMAKE_CXX_EXTENSIONS"] = "On"
+   else:
+      cmake_opts["CMAKE_CXX_EXTENSIONS"] = "Off"
 
 
    git_clone(args.kokkos_repo,args.kokkos_tag)
@@ -164,6 +178,7 @@ def cmake_build_and_install(install_path: str, repo_url: str, setup_script: str,
    full_cmd = f"source {setup_script} {install_path} && {cmake_cmd_str} && make -j -C {build_path} install"
 
    # Run the command
+   logger.debug("CMAKE COMMAND: %s",full_cmd)
    completed = subprocess.run(full_cmd, shell=True, 
                               cwd=repo_path,
                               stdout=open(f"{repo_name}_cmake_stdout.txt","w"),
