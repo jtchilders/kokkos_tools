@@ -14,7 +14,7 @@ DEFAULT_KOKKOS_KERNELS_REPO="https://github.com/kokkos/kokkos-kernels.git"
 DEFAULT_KOKKOS_KERNELS_VERSION=DEFAULT_KOKKOS_VERSION
 
 # default KOKKOS KERNELS REPO & VERSION
-DEFAULT_KOKKOS_TOOLS_REPO="https://github.com/kokkos/kokkos-kernels.git"
+DEFAULT_KOKKOS_TOOLS_REPO="https://github.com/kokkos/kokkos-tools.git"
 DEFAULT_KOKKOS_TOOLS_VERSION=""
 
 # default C++ standard
@@ -26,6 +26,7 @@ DEFAULT_CXX_STANDARD="17"
 cuda_arch = [
    "Kokkos_ARCH_VOLTA70",  # V100
    "Kokkos_ARCH_AMPERE80", # A100
+   "Kokkos_ARCH_HOPPER90", # H100
 ]
 
 amd_arch = [
@@ -47,12 +48,15 @@ def main():
    parser = argparse.ArgumentParser(description="Clones and builds kokkos and kokkos-kernels. Clones Kokkos-tools as well.")
    parser.add_argument("-t","--target",help="target base path for installation; note that the kokkos tag, architecture, and build type will be appended to this, e.g. <target>/kokkos-<version>/<arch>/<build>. All repos will be checked out here and a copy of the environment script will be dumped here, named 'setup.sh'.",required=True)
 
+   parser.add_argument("--no-kokkos",dest='run_kokkos', default=True, action="store_false", help="Do not install kokkos")
    parser.add_argument("--kokkos-repo",help=f"git url for kokkos; default = '{DEFAULT_KOKKOS_REPO}'",default=DEFAULT_KOKKOS_REPO)
    parser.add_argument("--kokkos-tag",help=f"tag to checkout for kokkos; default = '{DEFAULT_KOKKOS_VERSION}'",default=DEFAULT_KOKKOS_VERSION)
 
+   parser.add_argument("--no-kernels", dest='run_kernels', default=True, action="store_false", help="Do not install kokkos-kernels")
    parser.add_argument("--kokkos-kernels-repo",help=f"git url for kokkos-kernels; default = '{DEFAULT_KOKKOS_KERNELS_REPO}'",default=DEFAULT_KOKKOS_KERNELS_REPO)
    parser.add_argument("--kokkos-kernels-tag",help=f"tag to checkout for kokkos-kernels; default = '{DEFAULT_KOKKOS_KERNELS_VERSION}'",default=DEFAULT_KOKKOS_KERNELS_VERSION)
 
+   parser.add_argument("--no-tools", dest='run_tools', default=True, action="store_false", help="Do not install kokkos-tools")
    parser.add_argument("--kokkos-tools-repo",help=f"git url for kokkos-tools; default = '{DEFAULT_KOKKOS_TOOLS_REPO}'",default=DEFAULT_KOKKOS_TOOLS_REPO)
    parser.add_argument("--kokkos-tools-tag",help=f"tag to checkout for kokkos-tools; default = '{DEFAULT_KOKKOS_TOOLS_VERSION}'",default=DEFAULT_KOKKOS_TOOLS_VERSION)
 
@@ -95,50 +99,56 @@ def main():
    os.chdir(base_install_path)
 
    # clone kokkos
-   cmake_opts = {
-      args.arch: "On",
-      "CMAKE_CXX_STANDARD": args.cstd,
-      "CMAKE_POSITION_INDEPENDENT_CODE": "On",
-      "BUILD_SHARED_LIBS": shared_libs,
-      "CMAKE_CXX_EXTENSIONS": "On",
-      "CMAKE_BUILD_TYPE": args.build_type,
-   }
-   if args.arch in cuda_arch:
-      cmake_opts["Kokkos_ENABLE_CUDA"] = "On"
-      cmake_opts["Kokkos_ENABLE_CUDA_LAMBDA"] = "On"
-      cmake_opts["Kokkos_ENABLE_CUDA_CONSTEXPR"] = "On"
-   elif args.arch in amd_arch:
-      cmake_opts["Kokkos_ENABLE_HIP"] = "On"
-      cmake_opts["CMAKE_CXX_COMPILER"] = "$(which hipcc)"
-   elif args.arch in openmp_arch:
-      cmake_opts["Kokkos_ENABLE_OPENMP"] = "On"
+   if args.run_kokkos:
+      logger.info('installing kokkos: %s tag: %s',args.kokkos_repo,args.kokkos_tag)
+      cmake_opts = {
+         args.arch: "On",
+         "CMAKE_CXX_STANDARD": args.cstd,
+         "CMAKE_POSITION_INDEPENDENT_CODE": "On",
+         "BUILD_SHARED_LIBS": shared_libs,
+         "CMAKE_CXX_EXTENSIONS": "On",
+         "CMAKE_BUILD_TYPE": args.build_type,
+      }
+      if args.arch in cuda_arch:
+         cmake_opts["Kokkos_ENABLE_CUDA"] = "On"
+         cmake_opts["Kokkos_ENABLE_CUDA_LAMBDA"] = "On"
+         cmake_opts["Kokkos_ENABLE_CUDA_CONSTEXPR"] = "On"
+      elif args.arch in amd_arch:
+         cmake_opts["Kokkos_ENABLE_HIP"] = "On"
+         cmake_opts["CMAKE_CXX_COMPILER"] = "$(which hipcc)"
+      elif args.arch in openmp_arch:
+         cmake_opts["Kokkos_ENABLE_OPENMP"] = "On"
 
 
-   git_clone(args.kokkos_repo,args.kokkos_tag)
-   cmake_build_and_install(base_install_path,
-                           args.kokkos_repo,
-                           args.setup_script,
-                           **cmake_opts
-                           )
+      git_clone(args.kokkos_repo,args.kokkos_tag)
+      cmake_build_and_install(base_install_path,
+                              args.kokkos_repo,
+                              args.setup_script,
+                              **cmake_opts
+                              )
 
    # clone kokkos-kernels
-   git_clone(args.kokkos_kernels_repo,args.kokkos_kernels_tag)
-   cmake_opts = {
-      "CMAKE_POSITION_INDEPENDENT_CODE": "On",
-      "CMAKE_BUILD_TYPE": args.build_type,
-      "CMAKE_CXX_STANDARD": args.cstd,
-      "BUILD_SHARED_LIBS": shared_libs,
-   }
-   if args.arch in amd_arch:
-      cmake_opts["CMAKE_CXX_COMPILER"] = "$(which hipcc)"
-   cmake_build_and_install(base_install_path,
-                           args.kokkos_kernels_repo,
-                           args.setup_script,
-                           **cmake_opts
-                           )
+   if args.run_kernels:
+      logger.info('installing kokkos-kernels: %s tag: %s',args.kokkos_kernels_repo,args.kokkos_kernels_tag)
+      git_clone(args.kokkos_kernels_repo,args.kokkos_kernels_tag)
+      cmake_opts = {
+         "CMAKE_POSITION_INDEPENDENT_CODE": "On",
+         "CMAKE_BUILD_TYPE": args.build_type,
+         "CMAKE_CXX_STANDARD": args.cstd,
+         "BUILD_SHARED_LIBS": shared_libs,
+      }
+      if args.arch in amd_arch:
+         cmake_opts["CMAKE_CXX_COMPILER"] = "$(which hipcc)"
+      cmake_build_and_install(base_install_path,
+                              args.kokkos_kernels_repo,
+                              args.setup_script,
+                              **cmake_opts
+                              )
 
    # clone kokkos-tools
-   git_clone(args.kokkos_tools_repo,args.kokkos_tools_tag)
+   if args.run_tools:
+      logger.info('installing kokkos-tools: %s tag: %s',args.kokkos_tools_repo,args.kokkos_tools_tag)
+      git_clone(args.kokkos_tools_repo,args.kokkos_tools_tag)
 
    shutil.copyfile(args.setup_script,os.path.join(base_install_path,"setup.sh"))
 
